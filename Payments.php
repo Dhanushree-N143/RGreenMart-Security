@@ -1,6 +1,11 @@
 <?php require_once './includes/header.php'; ?>
 
 <?php
+/* ==========================================================
+   SOC 2 IMPLEMENTATION
+   Session Security
+========================================================== */
+require_once __DIR__ . "/includes/security/session_security.php";
 $imagePath = $_SERVER['DOCUMENT_ROOT'] . '/images/Payment.jpg';
 $imageExists = file_exists($imagePath);
 $cacheBust = $imageExists ? filemtime($imagePath) : 0;

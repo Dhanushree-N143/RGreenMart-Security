@@ -1,39 +1,133 @@
 <?php
 require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
+/* ==========================================================
+   SOC 2 IMPLEMENTATION
+   Loading Authentication Security Module
+========================================================== */
+require_once __DIR__ . "/includes/security/auth_security.php";
 
-$error = "";
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+$error = "";
+/* ==========================================================
+   SOC 2 IMPLEMENTATION
+   Session Timeout Notification
+========================================================== */
+
+if (isset($_GET['timeout'])) {
+    $error = "Your session has expired due to inactivity. Please login again.";
+}
+
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     $identifier = trim($_POST["identifier"]);
     $password   = trim($_POST["password"]);
 
-    $sql  = "SELECT * FROM users WHERE email = :id LIMIT 1";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute(['id' => $identifier]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    /* ==========================================================
+       SOC 2 IMPLEMENTATION
+       Validate Email Format
+    ========================================================== */
+    if (!filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
 
-    if ($user && password_verify($password, $user["password_hash"])) {
+        $error = "Please enter a valid email address.";
 
-        $_SESSION["user_id"]     = $user["id"];
-        $_SESSION["user_name"]   = $user["name"];
-        $_SESSION["user_email"]  = $user["email"];
-        $_SESSION["user_mobile"] = $user["mobile"];
+    }
 
-        if (!empty($_SESSION["redirect_after_login"])) {
-            $redirect = $_SESSION["redirect_after_login"];
-            unset($_SESSION["redirect_after_login"]);
-            header("Location: $redirect");
+    /* ==========================================================
+       SOC 2 IMPLEMENTATION
+       Brute Force Login Protection
+    ========================================================== */
+    elseif (isAccountLocked($conn, $identifier)) {
+
+        /* ==========================================================
+           SOC 2 IMPLEMENTATION
+           Login Blocked due to Brute Force Protection
+        ========================================================== */
+
+        logAudit(
+            $conn,
+            null,
+            $identifier,
+            "LOGIN_BLOCKED"
+        );
+
+        $error = "Too many failed login attempts. Please try again after 15 minutes.";
+
+    }
+
+    else {
+
+        $sql  = "SELECT * FROM users WHERE email = :id LIMIT 1";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['id' => $identifier]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user && password_verify($password, $user["password_hash"])) {
+
+            /* ==========================================================
+               SOC 2 IMPLEMENTATION
+               Successful Login Handling
+            ========================================================== */
+
+            // Prevent Session Fixation Attack
+            session_regenerate_id(true);
+            /* ==========================================================
+            SOC 2 IMPLEMENTATION
+            Track Session Activity
+            ========================================================== */
+
+            $_SESSION["last_activity"] = time();
+
+            // Remove previous failed attempts
+            clearFailedAttempts($conn, $identifier);
+
+            // Log successful login
+            logLoginAttempt($conn, $identifier, true);
+
+            // Audit successful login
+            logAudit(
+                $conn,
+                $user["id"],
+                $identifier,
+                "LOGIN_SUCCESS"
+            );
+
+            $_SESSION["user_id"]     = $user["id"];
+            $_SESSION["user_name"]   = $user["name"];
+            $_SESSION["user_email"]  = $user["email"];
+            $_SESSION["user_mobile"] = $user["mobile"];
+
+            if (!empty($_SESSION["redirect_after_login"])) {
+                $redirect = $_SESSION["redirect_after_login"];
+                unset($_SESSION["redirect_after_login"]);
+                header("Location: $redirect");
+                exit();
+            }
+
+            header("Location: index.php");
             exit();
-        }
 
-        header("Location: index.php");
-        exit();
-    } else {
-        $error = "Invalid login credentials!";
+        } else {
+
+            /* ==========================================================
+               SOC 2 IMPLEMENTATION
+               Failed Login Handling
+            ========================================================== */
+
+            logLoginAttempt($conn, $identifier, false);
+
+            logAudit(
+                $conn,
+                null,
+                $identifier,
+                "LOGIN_FAILED"
+            );
+
+            $error = "Invalid login credentials!";
+        }
     }
 }
 ?>

@@ -1,4 +1,9 @@
 <?php
+/* ==========================================================
+   SOC 2 IMPLEMENTATION
+   Session Security
+========================================================== */
+require_once __DIR__ . "/includes/security/session_security.php";
 session_start();
 header("Content-Type: application/json");
 require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";

@@ -1,4 +1,9 @@
 <?php
+/* ==========================================================
+   SOC 2 IMPLEMENTATION
+   Session Security
+========================================================== */
+require_once __DIR__ . "/includes/security/session_security.php";
 /**
  * generate_referral_code.php
  *

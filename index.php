@@ -3,7 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
+require_once __DIR__ . "/dbconf.php";
 $scrollMessages = $conn->query("SELECT message FROM scrolling_messages WHERE status=1 ORDER BY id DESC")
                        ->fetchAll(PDO::FETCH_ASSOC);
 

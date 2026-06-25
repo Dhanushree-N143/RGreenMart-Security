@@ -1,4 +1,9 @@
 <?php
+/* ==========================================================
+   SOC 2 IMPLEMENTATION
+   Session Security
+========================================================== */
+require_once __DIR__ . "/includes/security/session_security.php";
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);

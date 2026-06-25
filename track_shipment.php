@@ -1,4 +1,9 @@
 <?php
+/* ==========================================================
+   SOC 2 IMPLEMENTATION
+   Session Security
+========================================================== */
+require_once __DIR__ . "/includes/security/session_security.php";
 require_once __DIR__ . '/dbconf.php';
 require_once __DIR__ . '/api/shiprocket.php';
 
