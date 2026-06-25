@@ -14,6 +14,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once $_SERVER["DOCUMENT_ROOT"] . "/vendor/autoload.php";
 require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
 
+require_once __DIR__ . "/includes/security/csrf.php";
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception as MailException;
 
@@ -25,6 +27,9 @@ if (!$userId) {
 }
 
 $action = trim($_POST['action'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+}
 
 // ══════════════════════════════════════════════════════════
 //  ACTION: send_otp  — sends OTP to the new email address

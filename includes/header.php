@@ -5,6 +5,7 @@ if (!defined('HEADER_INCLUDED')) {
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . "/security/csrf.php";
 $isLoggedIn = isset($_SESSION['user_id']);
 
 // Fetch fresh user details if logged in
@@ -16,7 +17,7 @@ $referralStats   = ['count' => 0, 'people' => []];
 
 if ($isLoggedIn) {
     if (!isset($conn)) {
-        require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
+        require_once __DIR__ . "/../dbconf.php";
     }
     $uStmt = $conn->prepare("SELECT id, name, email, mobile, referral_code, referral_wallet, referred_by, referral_discount_type, referral_discount_value, referral_discount_used, email_verified FROM users WHERE id = ? LIMIT 1");
     $uStmt->execute([$_SESSION['user_id']]);
@@ -33,7 +34,7 @@ if ($isLoggedIn) {
 
         // Auto-generate referral code if missing
         if (empty($headerUser['referral_code'])) {
-            require_once $_SERVER["DOCUMENT_ROOT"] . "/generate_referral_code.php";
+            require_once __DIR__ . "/../generate_referral_code.php";
             $headerUser['referral_code'] = assignReferralCode($conn, (int)$_SESSION['user_id']);
         }
 
@@ -85,7 +86,10 @@ if ($isLoggedIn) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
-<head> 
+<head>
+    <script>
+        const csrfToken = "<?php echo csrf_token(); ?>";
+    </script> 
     <script>
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
@@ -861,6 +865,7 @@ if ($isLoggedIn) {
         const fd = new FormData();
         fd.append('action', 'send_otp');
         fd.append('email', email);
+        fd.append('csrf_token', csrfToken);
         let data;
         try {
             const res = await fetch('/update_profile.php', {method:'POST', body:fd});
@@ -896,6 +901,7 @@ if ($isLoggedIn) {
         fd.append('name',   name);
         fd.append('mobile', mobile);
         fd.append('email',  effectiveEmail);
+        fd.append('csrf_token', csrfToken);
         if (emailChanged) fd.append('otp', otp);
         let data;
         try {
@@ -946,6 +952,7 @@ if ($isLoggedIn) {
             btn.disabled = true; btn.textContent = 'Sending…';
             const fd = new FormData();
             fd.append('action', 'send_verify_otp');
+            fd.append('csrf_token', csrfToken);
             try {
                 const res  = await fetch('/update_profile.php', { method: 'POST', body: fd });
                 const text = await res.text();
@@ -983,6 +990,7 @@ if ($isLoggedIn) {
             const fd = new FormData();
             fd.append('action', 'confirm_verify_otp');
             fd.append('otp', otp);
+            fd.append('csrf_token', csrfToken);
             try {
                 const res  = await fetch('/update_profile.php', { method: 'POST', body: fd });
                 const text = await res.text();
