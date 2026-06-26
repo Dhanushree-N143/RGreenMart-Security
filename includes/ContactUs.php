@@ -84,14 +84,14 @@ $email = $contact['email'] ?? 'sales@rgreenmart.com';
                     <form action="../forms/contact.php" method="post" role="form" class="php-email-form">
                         <div class="row">
                             <div class="col-md-6 form-group mb-3">
-                                <input type="text" name="name" class="form-control" id="name" placeholder="Your Name" required pattern="^[A-Za-z ]{2,}$" title="Enter a valid name (letters only)">
+                                <input type="text" name="name" class="form-control" id="name" placeholder="Your Name" required maxlength="50" autocomplete="name" pattern="^[A-Za-z ]{2,50}$" title="Enter a valid name (letters and spaces only)">
                             </div>
                             <div class="col-md-6 form-group mb-3">
-                                <input type="email" class="form-control" name="email" id="email" placeholder="Your Email" required title="Enter a valid email address">
+                                <input type="email" autocomplete="email" class="form-control" name="email" id="email" placeholder="Your Email" required title="Enter a valid email address">
                             </div>
                         </div>
                         <div class="form-group mb-3">
-                            <input type="text" class="form-control" name="subject" id="subject" placeholder="Subject" required>
+                            <input type="text" class="form-control" name="subject" maxlength="100" required id="subject" placeholder="Subject" required>
                         </div>
                         <div class="form-group mb-3">
                             <textarea class="form-control" name="message" id="message" rows="5" placeholder="Message" required minlength="5" title="Enter your message"></textarea>

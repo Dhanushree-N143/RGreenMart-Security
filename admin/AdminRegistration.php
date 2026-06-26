@@ -2,52 +2,89 @@
 session_start();
 require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
 
-// --- Database Configuration ---
-$host = $_ENV['DB_HOST'] ?? 'localhost';
-$dbname = $_ENV['DB_NAME'] ?? 'diwali_db';
-$username = $_ENV['DB_USER'] ?? 'root';
-$password = $_ENV['DB_PASS'] ?? "";
-
 $error = null;
 $success = null;
 
-try {
-    $conn = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $conn->exec("SET NAMES utf8");
-} catch (PDOException $e) {
+// Ensure database connection exists
+if (!isset($conn)) {
+    error_log("Database connection not initialized.");
     $error = "Database connection failed.";
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
 
-    $adminUsername = trim($_POST['username'] ?? '');
-    $adminPassword = trim($_POST['password'] ?? '');
+    // Sanitize input
+    $adminUsername   = trim(strip_tags($_POST['username'] ?? ''));
+    $adminPassword   = trim($_POST['password'] ?? '');
+    $confirmPassword = trim($_POST['confirm_password'] ?? '');
 
-    if (empty($adminUsername) || empty($adminPassword)) {
-        $error = "Username and password are required.";
-    } else {
+    // Username validation
+    if (!preg_match('/^[A-Za-z0-9_]{3,30}$/', $adminUsername)) {
 
-        // Check if username already exists
-        $checkStmt = $conn->prepare("SELECT id FROM admin_users WHERE username = ? LIMIT 1");
-        $checkStmt->execute([$adminUsername]);
+        $error = "Username must contain only letters, numbers and underscore.";
 
-        if ($checkStmt->fetch()) {
-            $error = "Username already exists.";
-        } else {
-
-            // Hash password
-            $hashedPassword = password_hash($adminPassword, PASSWORD_DEFAULT);
-
-            // Insert admin user
-            $insertStmt = $conn->prepare(
-                "INSERT INTO admin_users (username, password) VALUES (?, ?)"
-            );
-            $insertStmt->execute([$adminUsername, $hashedPassword]);
-
-            $success = "Admin registered successfully.";
-        }
     }
+    // Password validation
+    elseif (strlen($adminPassword) < 8 || strlen($adminPassword) > 100) {
+
+        $error = "Password must be between 8 and 100 characters.";
+
+    }
+    // Confirm password
+    elseif ($adminPassword !== $confirmPassword) {
+
+        $error = "Passwords do not match.";
+
+    }
+    else {
+
+        try {
+
+            // Check duplicate username
+            $checkStmt = $conn->prepare("
+                SELECT id
+                FROM admin_users
+                WHERE username = ?
+                LIMIT 1
+            ");
+
+            $checkStmt->execute([$adminUsername]);
+
+            if ($checkStmt->fetch()) {
+
+                $error = "Username already exists.";
+
+            } else {
+
+                // Hash password
+                $hashedPassword = password_hash($adminPassword, PASSWORD_DEFAULT);
+
+                // Insert new admin
+                $insertStmt = $conn->prepare("
+                    INSERT INTO admin_users
+                    (username, password)
+                    VALUES (?, ?)
+                ");
+
+                $insertStmt->execute([
+                    $adminUsername,
+                    $hashedPassword
+                ]);
+
+                $success = "Admin registered successfully.";
+
+            }
+
+        } catch (PDOException $e) {
+
+            error_log($e->getMessage());
+
+            $error = "Something went wrong. Please try again.";
+
+        }
+
+    }
+
 }
 ?>
 
@@ -63,22 +100,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         <h2>Admin Registration</h2>
 
         <?php if ($error): ?>
-            <p style="color:red;font-weight:bold;"><?= htmlspecialchars($error) ?></p>
+            <p style="color:red;font-weight:bold;"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
 
         <?php if ($success): ?>
-            <p style="color:green;font-weight:bold;"><?= htmlspecialchars($success) ?></p>
+            <p style="color:green;font-weight:bold;"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
 
         <form method="POST" style="display:flex;flex-direction:column;">
             <label>Username</label>
-            <input type="text" name="username" required
+            <input type="text" name="username" maxlength="30" autocomplete="username" required value="<?= htmlspecialchars($adminUsername ?? '', ENT_QUOTES, 'UTF-8') ?>"
                    style="padding:10px;margin-bottom:20px;">
-
             <label>Password</label>
-            <input type="password" name="password" required
+            <input type="password" name="password" maxlength="100" autocomplete="new-password" required
                    style="padding:10px;margin-bottom:20px;">
-
+            <label>Confirm Password</label>
+            <input type="password" name="confirm_password" required autocomplete="new-password" style="padding:10px;margin-bottom:20px;">
             <button type="submit"
                     style="padding:10px;background:#4CAF50;color:white;border:none;">
                 Register

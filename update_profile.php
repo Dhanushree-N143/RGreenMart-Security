@@ -120,16 +120,25 @@ if ($action === 'send_otp') {
 //  ACTION: save_profile  — saves name, mobile, email
 // ══════════════════════════════════════════════════════════
 if ($action === 'save_profile') {
-    $name   = trim($_POST['name']   ?? '');
+    $name = strip_tags(trim($_POST['name'] ?? ''));
     $mobile = preg_replace('/\D/', '', $_POST['mobile'] ?? '');
-    $email  = trim($_POST['email']  ?? '');
+    $email = strtolower(trim($_POST['email'] ?? ''));
     $otp    = trim($_POST['otp']    ?? '');
 
     if (!$name) {
-        ob_end_clean();
-        echo json_encode(['success' => false, 'message' => 'Name is required.']);
-        exit;
-    }
+    ob_end_clean();
+    echo json_encode(['success' => false, 'message' => 'Name is required.']);
+    exit;
+}
+
+if (!preg_match("/^[a-zA-Z ]{2,50}$/", $name)) {
+    ob_end_clean();
+    echo json_encode([
+        'success' => false,
+        'message' => 'Name should contain only letters and spaces.'
+    ]);
+    exit;
+}
 
     // Fetch current user
     $cur = $conn->prepare("SELECT email, mobile FROM users WHERE id = ? LIMIT 1");
@@ -171,11 +180,14 @@ if ($action === 'save_profile') {
     }
 
     // Validate mobile (optional but if provided must be 10 digits)
-    if ($mobile !== '' && strlen($mobile) !== 10) {
-        ob_end_clean();
-        echo json_encode(['success' => false, 'message' => 'Mobile number must be 10 digits.']);
-        exit;
-    }
+    if ($mobile !== '' && !preg_match('/^[6-9][0-9]{9}$/', $mobile)) {
+    ob_end_clean();
+    echo json_encode([
+        'success' => false,
+        'message' => 'Please enter a valid 10-digit mobile number.'
+    ]);
+    exit;
+}
 
     // Update users table
     $stmt = $conn->prepare("UPDATE users SET name = ?, mobile = ?, email = ? WHERE id = ?");

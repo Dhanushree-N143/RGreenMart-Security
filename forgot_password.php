@@ -7,18 +7,23 @@ use PHPMailer\PHPMailer\Exception;
 
 $error = "";
 $success = "";
-$step = 1; // default step
+$step = 1;
 $latestReset = null;
 
-// -----------------------------
 // STEP 1: Send OTP
-// -----------------------------
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['send_otp'])) {
-    $input = trim($_POST['user_input']);
+
+    $input = trim(strip_tags($_POST['user_input'] ?? ''));
 
     if ($input === "") {
         $error = "Enter your email or mobile number.";
+    } elseif (
+        !filter_var($input, FILTER_VALIDATE_EMAIL) &&
+        !preg_match('/^[6-9][0-9]{9}$/', $input)
+    ) {
+        $error = "Enter a valid email address or mobile number.";
     } else {
+
         $stmt = $conn->prepare("SELECT id,email FROM users WHERE email=? OR mobile=?");
         $stmt->execute([$input, $input]);
         $user = $stmt->fetch();
@@ -26,53 +31,37 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['send_otp'])) {
         if (!$user) {
             $error = "No account found with this email or mobile.";
         } else {
+
             $otp = random_int(100000, 999999);
             $otpHash = password_hash($otp, PASSWORD_BCRYPT);
 
-            // Insert OTP into password_resets table
-            $conn->prepare(
-                "INSERT INTO password_resets (user_id, otp_hash, expires_at)
-                 VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))"
-            )->execute([$user['id'], $otpHash]);
+            $conn->prepare("INSERT INTO password_resets (user_id, otp_hash, expires_at)
+                VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))")
+                ->execute([$user['id'], $otpHash]);
 
-            // Get latest OTP entry for conditional tracking
             $stmt = $conn->prepare("SELECT * FROM password_resets WHERE user_id=? ORDER BY id DESC LIMIT 1");
             $stmt->execute([$user['id']]);
             $latestReset = $stmt->fetch();
+
             $step = 2;
 
-            // Send Email
-            $mail = new PHPMailer(true);
             try {
+                $mail = new PHPMailer(true);
                 $mail->isSMTP();
-                $mail->Host       = MAIL_HOST;
-                $mail->SMTPAuth   = true;
-                $mail->Username   = SMTP_MAIL;
-                $mail->Password   = SMTP_PASSWORD;
+                $mail->Host = MAIL_HOST;
+                $mail->SMTPAuth = true;
+                $mail->Username = SMTP_MAIL;
+                $mail->Password = SMTP_PASSWORD;
                 $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                $mail->Port       = 587;
-                $mail->SMTPDebug  = 0;
-                $mail->Timeout    = 30;
-                $mail->CharSet    = 'UTF-8';
-                $mail->SMTPOptions = [
-                    'ssl' => [
-                        'verify_peer'       => false,
-                        'verify_peer_name'  => false,
-                        'allow_self_signed' => true,
-                    ],
-                    'tls' => [
-                        'verify_peer'       => false,
-                        'verify_peer_name'  => false,
-                        'allow_self_signed' => true,
-                    ],
-                ];
+                $mail->Port = 587;
 
                 $mail->setFrom(SMTP_MAIL, "RGreenMart");
                 $mail->addAddress($user['email']);
                 $mail->isHTML(true);
                 $mail->Subject = "Password Reset OTP";
-                $mail->Body = "<h3>Password Reset</h3><p>Your OTP is: <b>$otp</b></p><p>Valid for 10 minutes</p>";
+                $mail->Body = "<h3>Password Reset</h3><p>Your OTP is: <b>{$otp}</b></p><p>Valid for 10 minutes</p>";
                 $mail->send();
+
                 $success = "OTP sent to your email.";
             } catch (Exception $e) {
                 $error = "Unable to send OTP. Try again later.";
@@ -81,36 +70,38 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['send_otp'])) {
     }
 }
 
-// -----------------------------
 // STEP 2: Verify OTP
-// -----------------------------
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['verify_otp'])) {
-    $user_id = $_POST['user_id'];
-    $otp = trim($_POST['otp']);
 
-    // Fetch latest unused OTP
-    $stmt = $conn->prepare("SELECT * FROM password_resets WHERE user_id=? AND used=0 AND expires_at > NOW() ORDER BY id DESC LIMIT 1");
-    $stmt->execute([$user_id]);
-    $latestReset = $stmt->fetch();
+    $user_id = (int)($_POST['user_id'] ?? 0);
+    $otp = trim($_POST['otp'] ?? '');
 
-    if (!$latestReset || !password_verify($otp, $latestReset['otp_hash'])) {
-        $error = "Invalid or expired OTP.";
+    if (!preg_match('/^[0-9]{6}$/', $otp)) {
+        $error = "Invalid OTP format.";
         $step = 2;
     } else {
-        // Mark OTP as used
-        $conn->prepare("UPDATE password_resets SET used=1 WHERE id=?")->execute([$latestReset['id']]);
-        $success = "OTP verified. Enter new password.";
-        $step = 3;
+
+        $stmt = $conn->prepare("SELECT * FROM password_resets WHERE user_id=? AND used=0 AND expires_at>NOW() ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$user_id]);
+        $latestReset = $stmt->fetch();
+
+        if (!$latestReset || !password_verify($otp, $latestReset['otp_hash'])) {
+            $error = "Invalid or expired OTP.";
+            $step = 2;
+        } else {
+            $conn->prepare("UPDATE password_resets SET used=1 WHERE id=?")->execute([$latestReset['id']]);
+            $success = "OTP verified. Enter your new password.";
+            $step = 3;
+        }
     }
 }
 
-// -----------------------------
 // STEP 3: Reset Password
-// -----------------------------
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['reset_pass'])) {
-    $user_id = $_POST['user_id'];
-    $password = trim($_POST['password']);
-    $confirm_password = trim($_POST['confirm_password']);
+
+    $user_id = (int)($_POST['user_id'] ?? 0);
+    $password = trim($_POST['password'] ?? '');
+    $confirm_password = trim($_POST['confirm_password'] ?? '');
 
     if (strlen($password) < 6) {
         $error = "Password must be at least 6 characters.";
@@ -121,7 +112,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['reset_pass'])) {
     } else {
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $conn->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([$hash, $user_id]);
-        $success = "Password updated successfully. <a href='login.php'>Login</a>";
+        $success = "Password updated successfully.";
         $step = 1;
         $latestReset = null;
     }
@@ -150,11 +141,11 @@ else echo "Reset Password";
 </h2>
 
 <?php if ($error): ?>
-<div class="bg-red-100 text-red-800 p-3 mb-4 rounded"><?= $error ?></div>
+<div class="bg-red-100 text-red-800 p-3 mb-4 rounded"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
 <?php if ($success): ?>
-<div class="bg-green-100 text-green-800 p-3 mb-4 rounded"><?= $success ?></div>
+<div class="bg-green-100 text-green-800 p-3 mb-4 rounded"><?= htmlspecialchars($success) ?></div>
 <?php endif; ?>
 
 <!-- STEP 1 -->
@@ -168,7 +159,7 @@ else echo "Reset Password";
 <?php elseif ($step === 2): ?>
 <form method="POST" class="space-y-4">
     <input type="text" name="otp" placeholder="Enter OTP" class="w-full p-3 border rounded-lg" required>
-    <input type="hidden" name="user_id" value="<?= $latestReset['user_id'] ?>">
+    <input type="hidden" name="user_id" value="<?= htmlspecialchars((string)$latestReset['user_id']) ?>">
     <button name="verify_otp" class="w-full bg-green-600 text-white p-3 rounded-lg">Verify OTP</button>
 </form>
 
@@ -177,7 +168,7 @@ else echo "Reset Password";
 <form method="POST" class="space-y-4">
     <input type="password" name="password" placeholder="New Password" class="w-full p-3 border rounded-lg" required>
     <input type="password" name="confirm_password" placeholder="Confirm Password" class="w-full p-3 border rounded-lg" required>
-    <input type="hidden" name="user_id" value="<?= $latestReset['user_id'] ?>">
+    <input type="hidden" name="user_id" value="<?= htmlspecialchars((string)$latestReset['user_id']) ?>">
     <button name="reset_pass" class="w-full bg-green-600 text-white p-3 rounded-lg">Reset Password</button>
 </form>
 <?php endif; ?>

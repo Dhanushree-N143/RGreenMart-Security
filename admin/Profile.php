@@ -10,19 +10,31 @@ require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
 
 $message = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_admin'])) {
-    $id = (int)$_POST['id'];
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+
+if ($id === false || $id <= 0) {
+    $message = "Invalid ID.";
+}
     // ✅ Prevent self-deletion
     if ($id === (int)$_SESSION['admin_id']) {
         $message = "You cannot delete your own account.";
     } else {
         $stmt = $conn->prepare("DELETE FROM admin_users WHERE id = ?");
         $stmt->execute([$id]);
-        $message = "Admin deleted successfully.";
+        if ($stmt->rowCount()) {
+    $message = "Admin deleted successfully.";
+} else {
+    $message = "Admin not found.";
+}
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
-    $id = (int)$_POST['id'];
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+
+if ($id === false || $id <= 0) {
+    $message = "Invalid ID.";
+}
     try {
         $conn->beginTransaction();
 
@@ -48,7 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
         $message = "User deleted successfully.";
     } catch (\PDOException $e) {
         $conn->rollBack();
-        $message = "Delete failed: " . $e->getMessage();
+        error_log($e->getMessage());
+
+$message = "Something went wrong while deleting the user.";
     }
 }
 

@@ -54,15 +54,15 @@ if ($isAdminApi) {
     }
 
     $params = [
-        trim($data['contact_name']),
-        $mobile,
-        trim($data['address_line1']),
-        trim($data['address_line2'] ?? ''),
-        trim($data['city']),
-        trim($data['state']),
-        $pincode,
-        trim($data['landmark'] ?? '')
-    ];
+    strip_tags(trim($data['contact_name'] ?? '')),
+    $mobile,
+    strip_tags(trim($data['address_line1'] ?? '')),
+    strip_tags(trim($data['address_line2'] ?? '')),
+    strip_tags(trim($data['city'] ?? '')),
+    strip_tags(trim($data['state'] ?? '')),
+    $pincode,
+    strip_tags(trim($data['landmark'] ?? ''))
+];
 
     if ($id > 0) {
         // EDIT: verify address belongs to this user
@@ -117,18 +117,50 @@ if (!$user_id) {
 
 $is_default = isset($_POST['is_default']) ? 1 : 0;
 
+// Sanitize input
+$contact_name   = strip_tags(trim($_POST['contact_name'] ?? ''));
+$contact_mobile = trim($_POST['contact_mobile'] ?? '');
+$address_line1  = strip_tags(trim($_POST['address_line1'] ?? ''));
+$address_line2  = strip_tags(trim($_POST['address_line2'] ?? ''));
+$city           = strip_tags(trim($_POST['city'] ?? ''));
+$state          = strip_tags(trim($_POST['state'] ?? ''));
+$landmark       = strip_tags(trim($_POST['landmark'] ?? ''));
+$pincode        = trim($_POST['pincode'] ?? '');
+
 if ($is_default) {
     $conn->prepare("UPDATE user_addresses SET is_default = 0 WHERE user_id = ?")
          ->execute([$user_id]);
 }
 
-$pincode = $_POST['pincode'];
+// Contact name validation
+if (!preg_match("/^[a-zA-Z ]{2,50}$/", $contact_name)) {
+    die("Invalid contact name.");
+}
 
-// Validate pincode (only 6 digits)
+// Mobile validation
+if (!preg_match('/^[6-9][0-9]{9}$/', $contact_mobile)) {
+    die("Invalid mobile number.");
+}
+
+// Address validation
+if (strlen($address_line1) < 5 || strlen($address_line1) > 100) {
+    die("Invalid address.");
+}
+
+// City validation
+if (!preg_match("/^[a-zA-Z ]{2,40}$/", $city)) {
+    die("Invalid city.");
+}
+
+// State validation
+if (!preg_match("/^[a-zA-Z ]{2,40}$/", $state)) {
+    die("Invalid state.");
+}
+
+// Pincode validation
 if (!preg_match('/^\d{6}$/', $pincode)) {
     die("Invalid pincode. Only 6-digit numbers allowed.");
 }
-
 
 $stmt = $conn->prepare("
     INSERT INTO user_addresses (
@@ -139,16 +171,15 @@ $stmt = $conn->prepare("
 
 $stmt->execute([
     $user_id,
-    $_POST['contact_name'],
-    $_POST['contact_mobile'],
-    $_POST['address_line1'],
-    $_POST['address_line2'],
-    $_POST['city'],
-    $_POST['state'],
+    $contact_name,
+    $contact_mobile,
+    $address_line1,
+    $address_line2,
+    $city,
+    $state,
     $pincode,
-    $_POST['landmark'],
+    $landmark,
     $is_default
 ]);
-
 header("Location: add_delivery_address.php");
 exit;

@@ -11,18 +11,46 @@ require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
 try {
     $promo = $conn->query("SELECT coupon_enabled FROM promo_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
+
+    error_log($e->getMessage());
+
     ob_end_clean();
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Something went wrong. Please try again later.'
+    ]);
+
     exit;
 }
 if (!$promo || !$promo['coupon_enabled']) {
     ob_end_clean();
-    echo json_encode(['success' => false, 'message' => 'Coupon codes are not available at the moment.']);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Coupon codes are not available at the moment.'
+    ]);
+
     exit;
 }
-
 $couponCode = strtoupper(trim($_POST['coupon_code'] ?? ''));
+if (!preg_match('/^[A-Z0-9_-]{3,20}$/', $couponCode)) {
+    ob_end_clean();
+    echo json_encode([
+        'success' => false,
+        'message' => 'Invalid coupon format.'
+    ]);
+    exit;
+}
 $cartTotal  = floatval($_POST['cart_total'] ?? 0);
+if ($cartTotal <= 0) {
+    ob_end_clean();
+    echo json_encode([
+        'success' => false,
+        'message' => 'Invalid cart total.'
+    ]);
+    exit;
+}
 
 if (!$couponCode) {
     ob_end_clean();
@@ -75,6 +103,15 @@ try {
         'message'         => "Coupon applied! You save $displayText",
     ]);
 } catch (Exception $e) {
+
+    error_log($e->getMessage());
+
     ob_end_clean();
-    echo json_encode(['success' => false, 'message' => 'DB error: ' . $e->getMessage()]);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Something went wrong. Please try again later.'
+    ]);
+
+    exit;
 }
