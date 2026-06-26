@@ -244,37 +244,46 @@ $isLoggedIn     = isset($_SESSION['user_id']);
 
 if ($isLoggedIn && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review'])) {
     $stars      = max(1, min(5, intval($_POST['stars'] ?? 0)));
-    $reviewText = trim($_POST['review_text'] ?? '');
-    $userId     = (int)$_SESSION['user_id'];
+    $reviewText = trim(strip_tags($_POST['review_text'] ?? ''));
+
+if (strlen($reviewText) > 500) {
+    $reviewMsg = "Review cannot exceed 500 characters.";
+    $reviewMsgType = "error";
+} else {
+
+    $userId = (int)$_SESSION['user_id'];
 
     // Check if user already reviewed
     $existsStmt = $conn->prepare("SELECT id FROM item_reviews WHERE item_id=? AND user_id=? LIMIT 1");
     $existsStmt->execute([$id, $userId]);
+
     if ($existsStmt->fetch()) {
-        $reviewMsg     = 'You have already reviewed this product.';
+        $reviewMsg = 'You have already reviewed this product.';
         $reviewMsgType = 'error';
     } else {
+
         $conn->beginTransaction();
+
         try {
-            $conn->prepare("INSERT INTO item_reviews (item_id, user_id, stars, review_text) VALUES (?,?,?,?)")
+            $conn->prepare("INSERT INTO item_reviews (item_id, user_id, stars, review_text)
+                            VALUES (?,?,?,?)")
                  ->execute([$id, $userId, $stars, $reviewText ?: null]);
-            $conn->prepare("UPDATE items SET total_rating_points = total_rating_points + ?, total_reviews = total_reviews + 1 WHERE id=?")
+
+            $conn->prepare("UPDATE items
+                            SET total_rating_points = total_rating_points + ?,
+                                total_reviews = total_reviews + 1
+                            WHERE id=?")
                  ->execute([$stars, $id]);
+
             $conn->commit();
-            $reviewMsg     = 'Thank you! Your review has been submitted.';
+
+            $reviewMsg = 'Thank you! Your review has been submitted.';
             $reviewMsgType = 'success';
-            // Recalculate rating after submission
-            $product['total_reviews']       = $totalReviews + 1;
-            $product['total_rating_points'] = $totalPoints  + $stars;
-            $totalReviews = $product['total_reviews'];
-            $totalPoints  = $product['total_rating_points'];
-            if ($totalReviews > 0) {
-                $finalRating = $totalPoints / $totalReviews;
-            }
-            $finalRating = round(max(0, min(5, $finalRating)), 1);
+
         } catch (Exception $e) {
             $conn->rollBack();
-            $reviewMsg     = 'Failed to submit review. Please try again.';
+
+            $reviewMsg = 'Failed to submit review. Please try again.';
             $reviewMsgType = 'error';
         }
     }

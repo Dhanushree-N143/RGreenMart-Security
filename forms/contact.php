@@ -68,10 +68,16 @@ $email   = trim(strip_tags($_POST['email']   ?? ''));
 $subject = trim(strip_tags($_POST['subject'] ?? ''));
 $message = trim(strip_tags($_POST['message'] ?? ''));
 
-if (strlen($name) < 2)                         jsonExit(false, 'Please enter your name.');
+if (!preg_match("/^[a-zA-Z ]{2,50}$/", $name)) {
+    jsonExit(false, 'Please enter a valid name.');
+}
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonExit(false, 'Please enter a valid email address.');
-if (empty($subject))                            jsonExit(false, 'Subject is required.');
-if (strlen($message) < 5)                       jsonExit(false, 'Message must be at least 5 characters.');
+if (strlen($subject) < 3 || strlen($subject) > 100) {
+    jsonExit(false, 'Subject must be between 3 and 100 characters.');
+}
+if (strlen($message) < 5 || strlen($message) > 1000) {
+    jsonExit(false, 'Message must be between 5 and 1000 characters.');
+}
 
 // ── Read SMTP credentials ─────────────────────────────────────────────────
 $smtpHost = $_ENV['MAIL_HOST']     ?? 'smtp.hostinger.com';
@@ -153,6 +159,6 @@ try {
 
 } catch (MailException $e) {
     error_log('[contact.php] SMTP error: ' . $mail->ErrorInfo);
-    // Return the actual SMTP error so you can see what's really happening
-    jsonExit(false, 'SMTP Error: ' . $mail->ErrorInfo);
+
+jsonExit(false, 'Unable to send your message. Please try again later.');
 }

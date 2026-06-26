@@ -1,54 +1,66 @@
 <?php
 session_start();
 require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
-// --- Database Configuration ---
-$host = $_ENV['DB_HOST'] ?? 'localhost';
-$dbname = $_ENV['DB_NAME'] ?? 'diwali_db';
-$username = $_ENV['DB_USER'] ?? 'root';
-$password = $_ENV['DB_PASS'] ?? ""; // Ensure this variable is used for DB connection
 
 $error = null;
 
-try {
-    $conn = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    // Set character set to UTF8
-    $conn->exec("set names utf8");
-} catch (PDOException $e) {
-    // In a production environment, avoid echoing the full error message
-    // echo "Connection failed: " . $e->getMessage();
-    $error = "Database connection failed."; 
-    // You might want to log the full error instead
+// Ensure database connection exists
+if (!isset($conn)) {
+    error_log("Database connection not initialized.");
+    $error = "Database connection failed.";
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
+
     // Sanitize input
-    
-    $adminUsername = trim($_POST['username'] ?? '');
+    $adminUsername = trim(strip_tags($_POST['username'] ?? ''));
     $adminPassword = trim($_POST['password'] ?? '');
 
-    // 1. Fetch user data (specifically the hashed password) from DB
-    $stmt = $conn->prepare("SELECT username, password FROM admin_users WHERE username = ? LIMIT 1");
-    $stmt->execute([$adminUsername]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // 2. Check if a user was found AND verify the password
-    if ($row && password_verify($adminPassword, $row['password'])) {
-        
-        // --- Authentication Success ---
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['admin_username'] = $row['username']; // Use the username fetched from DB
-        session_write_close();
-        // Redirect to the dashboard
-        header('Location: Manageitems.php');
-        exit;
-        
-    } else {
-        // --- Authentication Failure ---
+    // Username validation
+    if (!preg_match('/^[A-Za-z0-9_]{3,30}$/', $adminUsername)) {
         $error = "Invalid username or password.";
+    }
+
+    // Password validation
+    elseif (strlen($adminPassword) < 8 || strlen($adminPassword) > 100) {
+        $error = "Invalid username or password.";
+    }
+
+    else {
+
+        $stmt = $conn->prepare("
+            SELECT username, password
+            FROM admin_users
+            WHERE username = ?
+            LIMIT 1
+        ");
+
+        $stmt->execute([$adminUsername]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row && password_verify($adminPassword, $row['password'])) {
+
+            // Prevent Session Fixation
+            session_regenerate_id(true);
+
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_username'] = $row['username'];
+
+            session_write_close();
+
+            header("Location: Manageitems.php");
+            exit;
+
+        } else {
+
+            $error = "Invalid username or password.";
+
+        }
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -62,14 +74,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     <div class="container" style="max-width: 400px; margin: 50px auto; background-color: #d7f7cdff; border: 1px solid #ddd; border-radius: 5px; padding:50px;">
         <h2>Admin Login</h2>
         <?php if (isset($error)): ?>
-            <p class="error" style="color: red; text-align: center; font-weight: bold;"><?php echo htmlspecialchars($error); ?></p>
+            <p class="error" style="color: red; text-align: center; font-weight: bold;"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
         <form method="POST" style="display: flex; flex-direction: column;">
             <label style="margin-bottom: 10px;">Username:</label>
-            <input type="text" name="username" required style="padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px;">
+            <input type="text" name="username" autocomplete="username" maxlength="30" required style="padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px;">
             <label style="margin-bottom: 10px;">Password:</label>
             <div style="position: relative; margin-bottom: 20px;">
-                <input type="password" name="password" id="adminPassword" required
+                <input type="password" name="password" autocomplete="current-password"  maxlength="100" id="adminPassword" required
                     style="padding: 10px; padding-right: 42px; width: 100%; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box;">
                 <button type="button" id="togglePassword"
                     onclick="togglePass()"

@@ -40,16 +40,38 @@ if(!$settings){
 // ── Handle Form Submission ───────────────────────────────────────────────
 if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_shipping'])){
 
-    $shipping_mode         = $_POST['shipping_mode'] ?? 'default';
+    $allowedModes = [
+    'default',
+    'free',
+    'conditional',
+    'fixed',
+    'broker'
+];
+
+$shipping_mode = $_POST['shipping_mode'] ?? 'default';
+
+if (!in_array($shipping_mode, $allowedModes, true)) {
+    $shipping_mode = 'default';
+}
     $broker_enabled        = ($shipping_mode === 'broker') ? 1 : 0;
     $shipping_mode_enabled = ($shipping_mode !== 'default') ? 1 : 0;
 
-    $fixed_charge          = $_POST['fixed_charge']          ?? 0;
-    $conditional_min_order = $_POST['conditional_min_order'] ?? 0;
-    $broker_name           = $_POST['broker_name']           ?? null;
-    $broker_charge         = $_POST['broker_charge']         ?? 0;
-    $calculation_type      = $_POST['calculation_type']      ?? 'flat';
-    $weight_rate           = $_POST['weight_rate']           ?? 0;
+    $fixed_charge = max(0, (float)($_POST['fixed_charge'] ?? 0));
+    $conditional_min_order = max(0, (float)($_POST['conditional_min_order'] ?? 0));
+    $broker_name = trim(strip_tags($_POST['broker_name'] ?? ''));
+    $broker_charge = max(0, (float)($_POST['broker_charge'] ?? 0));
+
+if ($broker_name === '') {
+    $broker_name = null;
+}
+    $allowedCalculation = ['flat','weight'];
+
+$calculation_type = $_POST['calculation_type'] ?? 'flat';
+
+if (!in_array($calculation_type, $allowedCalculation, true)) {
+    $calculation_type = 'flat';
+}
+    $weight_rate = max(0, (float)($_POST['weight_rate'] ?? 0));
     $weight_slab           = max(0.001, (float)($_POST['weight_slab'] ?? 0.5));
 
     // COD + advance
