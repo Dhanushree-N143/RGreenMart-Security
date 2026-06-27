@@ -3,7 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
+require_once __DIR__ . "/dbconf.php";
 $scrollMessages = $conn->query("SELECT message FROM scrolling_messages WHERE status=1 ORDER BY id DESC")
                        ->fetchAll(PDO::FETCH_ASSOC);
 
@@ -282,6 +282,7 @@ foreach ($items as $idx => $item) {
         })(),
     ]; 
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -1018,7 +1019,7 @@ foreach ($items as $idx => $item) {
     </div>
     <?php endif; ?>
 
-    <?php require_once $_SERVER["DOCUMENT_ROOT"] . "/includes/header.php"; ?>
+    <?php require_once __DIR__ . "/includes/header.php"; ?> ?>
 
 <div class="top-scroll-bar">
     <div class="scroll-wrapper">

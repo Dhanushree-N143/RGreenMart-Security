@@ -1,5 +1,10 @@
 <?php
-require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
+require_once __DIR__ . "/dbconf.php";
+
+$error = "";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $error = "";
 if (session_status() === PHP_SESSION_NONE) {

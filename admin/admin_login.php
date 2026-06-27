@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
+require_once __DIR__ . "/../dbconf.php";
 // --- Database Configuration ---
 $host = $_ENV['DB_HOST'] ?? 'localhost';
 $dbname = $_ENV['DB_NAME'] ?? 'diwali_db';

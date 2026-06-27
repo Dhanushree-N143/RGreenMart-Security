@@ -5,6 +5,7 @@ if (!defined('HEADER_INCLUDED')) {
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
 $isLoggedIn = isset($_SESSION['user_id']);
 
 // Fetch fresh user details if logged in

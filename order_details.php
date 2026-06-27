@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once $_SERVER["DOCUMENT_ROOT"] . "/dbconf.php";
+require_once __DIR__ . "/dbconf.php";
 
 // ── Display dates in IST (Asia/Kolkata, UTC+5:30) ─────────────────────────────
 date_default_timezone_set('Asia/Kolkata');
